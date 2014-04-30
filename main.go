@@ -20,6 +20,7 @@ var debugFile string
 var logFile string
 var cmdsFile string
 
+// Header defines the struct of the header in the i3bar protocol.
 type Header struct {
 	Version     int  `json:"version"`
 	StopSignal  int  `json:"stop_signal,omitempty"`
@@ -27,6 +28,7 @@ type Header struct {
 	ClickEvents bool `json:"click_events,omitempty"`
 }
 
+// Block defines the struct of blocks in the i3bar protocol.
 type Block struct {
 	FullText            string `json:"full_text"`
 	ShortText           string `json:"short_text,omitempty"`
@@ -40,21 +42,27 @@ type Block struct {
 	SeparatorBlockWidth int    `json:"separator_block_width,omitempty"`
 }
 
+// String implements Stringer interface.
 func (b Block) String() string {
 	return b.FullText
 }
 
+// A CmdIO defines a cmd that will feed the i3bar.
 type CmdIO struct {
 	// Cmd is the command being run
-	Cmd    *exec.Cmd
+	Cmd *exec.Cmd
+	// reader is the underlying stream where Cmd outputs data.
 	reader io.ReadCloser
 }
 
+// BlockAggregate relates a CmdIO to the Blocks it produced during one update.
 type BlockAggregate struct {
 	CmdIO  *CmdIO
 	Blocks []*Block
 }
 
+// NewCmdIO creates a new CmdIO from command c.
+// c must be properly quoted for a shell as it's passed to sh -c.
 func NewCmdIO(c string) (*CmdIO, error) {
 	cmd := exec.Command("sh", "-c", c)
 	reader, err := cmd.StdoutPipe()
@@ -69,6 +77,8 @@ func NewCmdIO(c string) (*CmdIO, error) {
 	return &cmdio, nil
 }
 
+// Start runs the command of CmdIO and feeds the BlockAggregatesCh channel
+// with the Blocks it produces.
 func (c *CmdIO) Start(blockAggregatesCh chan<- *BlockAggregate) error {
 	if err := c.Cmd.Start(); err != nil {
 		return err
@@ -132,22 +142,28 @@ func (c *CmdIO) Start(blockAggregatesCh chan<- *BlockAggregate) error {
 	return nil
 }
 
+// BlockAggregator fans-in all Blocks produced by a list of CmdIO and sends it to the writer W.
 type BlockAggregator struct {
+	// Blocks keeps track of which CmdIO produced which Block list.
 	Blocks map[*CmdIO][]*Block
+	// CmdIOs keeps an ordered list of the CmdIOs being aggregated.
 	CmdIOs []*CmdIO
-	w      io.Writer
+	// W is where multiplexed input blocks are written to.
+	W io.Writer
 }
 
+// NewBlockAggregator returns a BlockAggregator which will write to w.
 func NewBlockAggregator(w io.Writer) *BlockAggregator {
 	return &BlockAggregator{
 		Blocks: make(map[*CmdIO][]*Block),
 		CmdIOs: make([]*CmdIO, 0),
-		w:      w,
+		W:      w,
 	}
 }
 
+// Aggregate starts aggregating data coming from the BlockAggregates channel.
 func (ba *BlockAggregator) Aggregate(blockAggregates <-chan *BlockAggregate) {
-	jw := json.NewEncoder(ba.w)
+	jw := json.NewEncoder(ba.W)
 	for blockAggregate := range blockAggregates {
 		ba.Blocks[blockAggregate.CmdIO] = blockAggregate.Blocks
 		blocksUpdate := make([]*Block, 0)
@@ -157,7 +173,7 @@ func (ba *BlockAggregator) Aggregate(blockAggregates <-chan *BlockAggregate) {
 		if err := jw.Encode(blocksUpdate); err != nil {
 			log.Println(err)
 		}
-		ba.w.Write([]byte(","))
+		ba.W.Write([]byte(","))
 	}
 }
 
@@ -169,6 +185,7 @@ func init() {
 }
 
 func main() {
+	// Read and parse commands to run.
 	var cmdsReader io.ReadCloser
 	if cmdsFile == "-" {
 		cmdsReader = ioutil.NopCloser(os.Stdin)
@@ -192,6 +209,7 @@ func main() {
 	}
 	cmdsReader.Close()
 
+	// Init log output.
 	if logFile != "" {
 		f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0660)
 		if err != nil {
@@ -201,6 +219,7 @@ func main() {
 		log.SetOutput(f)
 	}
 
+	// Init where i3cat will print its output.
 	var out io.Writer
 	if debugFile != "" {
 		f, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0660)
@@ -213,6 +232,7 @@ func main() {
 		out = os.Stdout
 	}
 
+	// We print the header of i3bar
 	header := Header{1, 10, 12, true}
 	hb, err := json.Marshal(header)
 	if err != nil {
@@ -220,9 +240,9 @@ func main() {
 	}
 	fmt.Fprintf(out, "%s\n[\n", hb)
 
+	// Create the block aggregator and start the commands
 	blocksCh := make(chan *BlockAggregate)
 	ba := NewBlockAggregator(out)
-
 	for _, c := range commands {
 		cmdio, err := NewCmdIO(c)
 		if err != nil {
@@ -236,6 +256,7 @@ func main() {
 
 	go ba.Aggregate(blocksCh)
 
+	// Listen for worthy signals
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
