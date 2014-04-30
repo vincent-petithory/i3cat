@@ -28,7 +28,16 @@ type Header struct {
 }
 
 type Block struct {
-	FullText string `json:"full_text"`
+	FullText            string `json:"full_text"`
+	ShortText           string `json:"short_text,omitempty"`
+	Color               string `json:"color,omitempty"`
+	MinWidth            int    `json:"min_width,omitempty"`
+	Align               string `json:"align,omitempty"`
+	Name                string `json:"name,omitempty"`
+	Instance            string `json:"instance,omitempty"`
+	Urgent              bool   `json:"urgent,omitempty"`
+	Separator           bool   `json:"separator,omitempty"`
+	SeparatorBlockWidth int    `json:"separator_block_width,omitempty"`
 }
 
 func (b Block) String() string {
