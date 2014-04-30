@@ -80,12 +80,12 @@ func (c *CmdIO) Start(blockAggregatesCh chan<- *BlockAggregate) error {
 		}
 		if ruune == '{' {
 			// Consume the header line
-			if _, _, err := r.ReadLine(); err != nil {
+			if _, err := r.ReadString('\n'); err != nil {
 				log.Println(err)
 				return
 			}
 			// Consume the next line (opening bracket)
-			if _, _, err := r.ReadLine(); err != nil {
+			if _, err := r.ReadString('\n'); err != nil {
 				log.Println(err)
 				return
 			}
