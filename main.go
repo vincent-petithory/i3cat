@@ -19,6 +19,7 @@ import (
 var debugFile string
 var logFile string
 var cmdsFile string
+var header Header
 
 // Header defines the struct of the header in the i3bar protocol.
 type Header struct {
@@ -178,9 +179,13 @@ func (ba *BlockAggregator) Aggregate(blockAggregates <-chan *BlockAggregate) {
 }
 
 func init() {
-	flag.StringVar(&debugFile, "debug-file", "", "Outputs JSON to this file as well -- for debugging")
-	flag.StringVar(&logFile, "log-file", "", "Log i3cat events in this file")
-	flag.StringVar(&cmdsFile, "cmd-file", "$HOME/.i3/i3cat.conf", "File listing of the commands to run")
+	flag.StringVar(&debugFile, "debug-file", "", "Outputs JSON to this file as well; for debugging what is sent to i3bar.")
+	flag.StringVar(&logFile, "log-file", "", "Logs i3cat events in this file. Defaults to STDERR")
+	flag.StringVar(&cmdsFile, "cmd-file", "$HOME/.i3/i3cat.conf", "File listing of the commands to run. It will read from STDIN if - is provided")
+	flag.IntVar(&header.Version, "header-version", 1, "The i3bar header version")
+	flag.IntVar(&header.StopSignal, "header-stopsignal", 0, "The i3bar header stop_signal")
+	flag.IntVar(&header.ContSignal, "header-contsignal", 0, "The i3bar header cont_signal")
+	flag.BoolVar(&header.ClickEvents, "header-clickevents", false, "The i3bar header click_events")
 	flag.Parse()
 }
 
@@ -233,7 +238,6 @@ func main() {
 	}
 
 	// We print the header of i3bar
-	header := Header{1, 10, 12, true}
 	hb, err := json.Marshal(header)
 	if err != nil {
 		log.Fatal(err)
