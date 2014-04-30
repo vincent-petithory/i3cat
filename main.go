@@ -65,7 +65,7 @@ type BlockAggregate struct {
 // NewCmdIO creates a new CmdIO from command c.
 // c must be properly quoted for a shell as it's passed to sh -c.
 func NewCmdIO(c string) (*CmdIO, error) {
-	cmd := exec.Command("sh", "-c", c)
+	cmd := exec.Command(os.Getenv("SHELL"), "-c", c)
 	reader, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
