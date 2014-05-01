@@ -70,7 +70,9 @@ Run `i3cat -h` for a list of options:
 
 `i3cat` sends data to i3bar only when necessary: when a command sends an updated output of its blocks, `i3cat` caches it and sends to i3bar the updated output of all blocks, using the latest cached blocks of the other commands. This means commands don't need to have the same update frequency.
 
+It is not advised to send SIGSTOP and SIGCONT signals to`i3cat`, as its subprocesses will continue to output data anyway.
+For pausing and resuming processing (usually asked by i3bar), `i3cat` will listen for SIGUSR1 and SIGUSR2 for pausing and resuming, respectively. It will then forward the signals specified with `-header-stopsignal` and `-header-contsignal` flags (defaults to SIGSTOP and SIGCONT) to all its managed processes.
+
 ## TODO
 
- * Expose click events sent by i3bar to i3cat's STDIN,
- * Forward SIGSTOP/SIGCONT to processes started by i3cat.
+ * Expose click events sent by i3bar to i3cat's STDIN

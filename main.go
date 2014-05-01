@@ -183,8 +183,8 @@ func init() {
 	flag.StringVar(&logFile, "log-file", "", "Logs i3cat events in this file. Defaults to STDERR")
 	flag.StringVar(&cmdsFile, "cmd-file", "$HOME/.i3/i3cat.conf", "File listing of the commands to run. It will read from STDIN if - is provided")
 	flag.IntVar(&header.Version, "header-version", 1, "The i3bar header version")
-	flag.IntVar(&header.StopSignal, "header-stopsignal", 0, "The i3bar header stop_signal")
-	flag.IntVar(&header.ContSignal, "header-contsignal", 0, "The i3bar header cont_signal")
+	flag.IntVar(&header.StopSignal, "header-stopsignal", 0, "The i3bar header stop_signal. i3cat will send this signal to the processes it manages.")
+	flag.IntVar(&header.ContSignal, "header-contsignal", 0, "The i3bar header cont_signal. i3cat will send this signal to the processes it manages.")
 	flag.BoolVar(&header.ClickEvents, "header-clickevents", false, "The i3bar header click_events")
 	flag.Parse()
 }
@@ -237,6 +237,18 @@ func main() {
 		out = os.Stdout
 	}
 
+	// Resolve defaults for header signals
+	sigstop := syscall.SIGSTOP
+	sigcont := syscall.SIGCONT
+	if header.StopSignal > 0 {
+		sigstop = syscall.Signal(header.StopSignal)
+	}
+	if header.ContSignal > 0 {
+		sigcont = syscall.Signal(header.ContSignal)
+	}
+	header.StopSignal = int(syscall.SIGUSR1)
+	header.ContSignal = int(syscall.SIGUSR2)
+
 	// We print the header of i3bar
 	hb, err := json.Marshal(header)
 	if err != nil {
@@ -262,15 +274,17 @@ func main() {
 
 	// Listen for worthy signals
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2)
 
 	for {
 		// TODO handle sigcont and sigstop received from i3bar, and forward to cmds
 		s := <-c
 		switch s {
+		case syscall.SIGTERM:
+			fallthrough
 		case os.Interrupt:
 			// Kill all processes on interrupt
-			log.Println("SIGINT received: terminating all processes...")
+			log.Println("SIGINT or SIGTERM received: terminating all processes...")
 			for _, cmdio := range ba.CmdIOs {
 				if err := cmdio.Cmd.Process.Signal(syscall.SIGTERM); err != nil {
 					log.Println(err)
@@ -280,6 +294,20 @@ func main() {
 				}
 			}
 			os.Exit(0)
+		case syscall.SIGUSR1:
+			log.Printf("SIGUSR1 received: forwarding signal %d to all processes...\n", sigstop)
+			for _, cmdio := range ba.CmdIOs {
+				if err := cmdio.Cmd.Process.Signal(sigstop); err != nil {
+					log.Println(err)
+				}
+			}
+		case syscall.SIGUSR2:
+			log.Printf("SIGUSR1 received: forwarding signal %d to all processes...\n", sigcont)
+			for _, cmdio := range ba.CmdIOs {
+				if err := cmdio.Cmd.Process.Signal(sigcont); err != nil {
+					log.Println(err)
+				}
+			}
 		}
 	}
 }
