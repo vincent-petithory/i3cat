@@ -140,9 +140,22 @@ func (c *CmdIO) Start(blockAggregatesCh chan<- *BlockAggregate) error {
 					return
 				}
 				log.Printf("Invalid JSON input: all decoding methods failed (%v)\n", err)
-			} else {
-				blockAggregatesCh <- &BlockAggregate{c, b}
+				// consume all remaining data to prevent looping forever on a decoding err
+				for r.Buffered() > 0 {
+					_, err := r.ReadByte()
+					if err != nil {
+						log.Println(err)
+					}
+				}
+				// send an error block
+				b = []*Block{
+					{
+						FullText: fmt.Sprintf("Error parsing input: %v", err),
+						Color:    "#FF0000",
+					},
+				}
 			}
+			blockAggregatesCh <- &BlockAggregate{c, b}
 		}
 	}()
 	return nil
