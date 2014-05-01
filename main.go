@@ -285,6 +285,8 @@ func main() {
 		ba.CmdIOs = append(ba.CmdIOs, cmdio)
 		if err := cmdio.Start(blocksCh); err != nil {
 			log.Fatal(err)
+		} else {
+			log.Printf("Starting command: %s", c)
 		}
 	}
 
