@@ -113,6 +113,7 @@ func (c *CmdIO) Start(blockAggregatesCh chan<- *BlockAggregate) error {
 			r.UnreadRune()
 		}
 		dec := json.NewDecoder(r)
+		defer c.reader.Close()
 		for {
 			var b []*Block
 			// Ignore unwanted chars first
@@ -121,7 +122,7 @@ func (c *CmdIO) Start(blockAggregatesCh chan<- *BlockAggregate) error {
 				ruune, _, err := r.ReadRune()
 				if err != nil {
 					log.Println(err)
-					continue
+					break IgnoreChars
 				}
 				switch {
 				case unicode.IsSpace(ruune):
@@ -134,11 +135,15 @@ func (c *CmdIO) Start(blockAggregatesCh chan<- *BlockAggregate) error {
 				}
 			}
 			if err := dec.Decode(&b); err != nil {
+				if err == io.EOF {
+					log.Println("reached EOF")
+					return
+				}
 				log.Printf("Invalid JSON input: all decoding methods failed (%v)\n", err)
+			} else {
+				blockAggregatesCh <- &BlockAggregate{c, b}
 			}
-			blockAggregatesCh <- &BlockAggregate{c, b}
 		}
-		c.reader.Close()
 	}()
 	return nil
 }
