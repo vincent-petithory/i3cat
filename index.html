@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=640" />
+
+    <link rel="stylesheet" href="stylesheets/core.css" media="screen"/>
+    <link rel="stylesheet" href="stylesheets/mobile.css" media="handheld, only screen and (max-device-width:640px)"/>
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css"/>
+
+    <script type="text/javascript" src="javascripts/modernizr.js"></script>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script type="text/javascript" src="javascripts/headsmart.min.js"></script>
+    <script type="text/javascript">
+      $(document).ready(function () {
+        $('#main_content').headsmart()
+      })
+    </script>
+    <title>I3cat by vincent-petithory</title>
+  </head>
+
+  <body>
+    <a id="forkme_banner" href="https://github.com/vincent-petithory/i3cat">View on GitHub</a>
+    <div class="shell">
+
+      <header>
+        <span class="ribbon-outer">
+          <span class="ribbon-inner">
+            <h1>I3cat</h1>
+            <h2>A simple program to combine multiple i3bar JSON inputs into one to forward to i3bar.</h2>
+          </span>
+          <span class="left-tail"></span>
+          <span class="right-tail"></span>
+        </span>
+      </header>
+
+      <section id="downloads">
+        <span class="inner">
+          <a href="https://github.com/vincent-petithory/i3cat/zipball/master" class="zip"><em>download</em> .ZIP</a><a href="https://github.com/vincent-petithory/i3cat/tarball/master" class="tgz"><em>download</em> .TGZ</a>
+        </span>
+      </section>
+
+
+      <span class="banner-fix"></span>
+
+
+      <section id="main_content">
+        <p>A simple program to combine multiple i3bar JSON inputs into one to forward to i3bar.
+<a href="https://app.wercker.com/project/bykey/f9749c41b63024450dc703f139e922ce"><img src="https://app.wercker.com/status/f9749c41b63024450dc703f139e922ce/s/" alt="wercker status" title="wercker status"></a></p>
+
+<h2>
+<a name="motivation" class="anchor" href="#motivation"><span class="octicon octicon-link"></span></a>Motivation</h2>
+
+<ul>
+<li>enjoy the simplicity of i3status, do not replace it with a fully featured wrapper</li>
+<li>use simple shell scripts to add new i3bar blocks</li>
+</ul><h2>
+<a name="walkthrough" class="anchor" href="#walkthrough"><span class="octicon octicon-link"></span></a>Walkthrough</h2>
+
+<h3>
+<a name="install" class="anchor" href="#install"><span class="octicon octicon-link"></span></a>Install</h3>
+
+<p>Several options:</p>
+
+<ul>
+<li>Download a binary for your platform <a href="http://gobuild.io/github.com/vincent-petithory/i3cat"><img src="http://gobuild.io/badge/github.com/vincent-petithory/i3cat/download.png" alt="Gobuild Download"></a>
+</li>
+<li>
+<a href="http://golang.org/doc/install">Install Go</a> and run <code>go get github.com/vincent-petithory/i3cat</code>
+</li>
+<li>If you're on Arch Linux, you can install from <a href="https://aur.archlinux.org/packages/i3cat-git/">AUR</a>.</li>
+</ul><h3>
+<a name="get-what-you-had-with-i3status" class="anchor" href="#get-what-you-had-with-i3status"><span class="octicon octicon-link"></span></a>Get what you had with i3status:</h3>
+
+<p><code>status_command i3status --config ~/.i3/status</code> becomes <code>status_command echo "i3status --config ~/.i3/status" | i3cat</code></p>
+
+<p>But since you will want to add other blocks, it's more handy to add the commands in a conf file:</p>
+
+<pre><code>$ cat ~/.i3/i3cat.conf
+# i3 status
+i3status -c ~/.i3/status
+</code></pre>
+
+<p>and the status command is now <code>status_command i3cat</code> (<code>~/.i3/i3cat.conf</code> is the default location for its conf file).</p>
+
+<h3>
+<a name="add-a-block" class="anchor" href="#add-a-block"><span class="octicon octicon-link"></span></a>Add a block</h3>
+
+<p>Say we want to display the current song played by MPD every 10 seconds. The script could be:</p>
+
+<pre><code>$ cat ~/.i3/mpd-nowplaying.sh
+#!/bin/sh
+while :; do
+  echo '[{"name":"mpd","instance":"now playing","full_text":" '$(mpc current)'"}]'
+  sleep 10
+done
+</code></pre>
+
+<p>Edit <code>~/.i3/i3cat.conf</code>:</p>
+
+<pre><code>$ cat i3cat.conf
+# mpc status
+~/.i3/mpd-nowplaying.sh
+# i3 status
+i3status -c ~/.i3/status
+</code></pre>
+
+<p>The order matters: the output of the commands are sent to i3bar in that order.
+Lines starting with <code>#</code> are comments and ignored.</p>
+
+<p>Note the JSON output of the script is an array. <code>i3cat</code> also supports variants like the output from <code>i3status</code>: a i3bar header (or not) followed by an infinite array.</p>
+
+<h3>
+<a name="more" class="anchor" href="#more"><span class="octicon octicon-link"></span></a>More</h3>
+
+<p>Run <code>i3cat -h</code> for a list of options:</p>
+
+<pre><code>Usage of i3cat:
+  -cmd-file="$HOME/.i3/i3cat.conf": File listing of the commands to run. It will read from STDIN if - is provided
+  -debug-file="": Outputs JSON to this file as well; for debugging what is sent to i3bar.
+  -header-clickevents=false: The i3bar header click_events
+  -header-contsignal=0: The i3bar header cont_signal
+  -header-stopsignal=0: The i3bar header stop_signal
+  -header-version=1: The i3bar header version
+  -log-file="": Logs i3cat events in this file. Defaults to STDERR
+</code></pre>
+
+<h2>
+<a name="design" class="anchor" href="#design"><span class="octicon octicon-link"></span></a>Design</h2>
+
+<p><code>i3cat</code> sends data to i3bar only when necessary: when a command sends an updated output of its blocks, <code>i3cat</code> caches it and sends to i3bar the updated output of all blocks, using the latest cached blocks of the other commands. This means commands don't need to have the same update frequency.</p>
+
+<p>It is not advised to send SIGSTOP and SIGCONT signals to<code>i3cat</code>, as its subprocesses will continue to output data anyway.
+For pausing and resuming processing (usually asked by i3bar), <code>i3cat</code> will listen for SIGUSR1 and SIGUSR2 for pausing and resuming, respectively. It will then forward the signals specified with <code>-header-stopsignal</code> and <code>-header-contsignal</code> flags (defaults to SIGSTOP and SIGCONT) to all its managed processes.</p>
+
+<h2>
+<a name="todo" class="anchor" href="#todo"><span class="octicon octicon-link"></span></a>TODO</h2>
+
+<ul>
+<li>Expose click events sent by i3bar to i3cat's STDIN</li>
+</ul>
+      </section>
+
+      <footer>
+        <span class="ribbon-outer">
+          <span class="ribbon-inner">
+            <p>this project by <a href="https://github.com/vincent-petithory">vincent-petithory</a> can be found on <a href="https://github.com/vincent-petithory/i3cat">GitHub</a></p>
+          </span>
+          <span class="left-tail"></span>
+          <span class="right-tail"></span>
+        </span>
+        <p>Generated with <a href="http://pages.github.com">GitHub Pages</a> using Merlot</p>
+        <span class="octocat"></span>
+      </footer>
+
+    </div>
+
+    
+  </body>
+</html>
