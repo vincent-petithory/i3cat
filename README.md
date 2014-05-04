@@ -29,6 +29,14 @@ But since you will want to add other blocks, it's more handy to add the commands
 
 and the status command is now `status_command i3cat` (`~/.i3/i3cat.conf` is the default location for its conf file).
 
+Note that your i3status'conf must have his output in i3bar format. If you didn't have it yet, modify it as follows:
+
+	general {
+		...
+		output_format = i3bar
+		...
+	}
+
 ### Add a block
 
 Say we want to display the current song played by MPD every 10 seconds. The script could be:
