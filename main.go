@@ -54,6 +54,8 @@ type CmdIO struct {
 	Cmd *exec.Cmd
 	// reader is the underlying stream where Cmd outputs data.
 	reader io.ReadCloser
+	// writer is the underlying stream where Cmd outputs data.
+	writer io.WriteCloser
 }
 
 // BlockAggregate relates a CmdIO to the Blocks it produced during one update.
@@ -70,10 +72,15 @@ func NewCmdIO(c string) (*CmdIO, error) {
 	if err != nil {
 		return nil, err
 	}
+	writer, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
 
 	cmdio := CmdIO{
 		Cmd:    cmd,
 		reader: reader,
+		writer: writer,
 	}
 	return &cmdio, nil
 }
@@ -113,7 +120,6 @@ func (c *CmdIO) Start(blockAggregatesCh chan<- *BlockAggregate) error {
 			r.UnreadRune()
 		}
 		dec := json.NewDecoder(r)
-		defer c.reader.Close()
 		for {
 			var b []*Block
 			// Ignore unwanted chars first
@@ -161,6 +167,17 @@ func (c *CmdIO) Start(blockAggregatesCh chan<- *BlockAggregate) error {
 	return nil
 }
 
+// Close closes reader and writers of this CmdIO.
+func (c *CmdIO) Close() error {
+	if err := c.reader.Close(); err != nil {
+		return err
+	}
+	if err := c.writer.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
 // BlockAggregator fans-in all Blocks produced by a list of CmdIO and sends it to the writer W.
 type BlockAggregator struct {
 	// Blocks keeps track of which CmdIO produced which Block list.
@@ -194,6 +211,104 @@ func (ba *BlockAggregator) Aggregate(blockAggregates <-chan *BlockAggregate) {
 		}
 		ba.W.Write([]byte(","))
 	}
+}
+
+// ForwardClickEvents relays click events emitted on ceCh to interested parties.
+// An interested party is a cmdio whose
+func (ba *BlockAggregator) ForwardClickEvents(ceCh <-chan ClickEvent) {
+FWCE:
+	for ce := range ceCh {
+		for _, cmdio := range ba.CmdIOs {
+			blocks, ok := ba.Blocks[cmdio]
+			if !ok {
+				continue
+			}
+			for _, block := range blocks {
+				if block.Name == ce.Name && block.Instance == ce.Instance {
+					if err := json.NewEncoder(cmdio.writer).Encode(ce); err != nil {
+						log.Println(err)
+					}
+					log.Printf("Sending click event %+v to %s\n", ce, cmdio.Cmd.Args)
+					// One of the blocks of this cmdio matched.
+					// We don't want more since a name/instance is supposed to be unique.
+					continue FWCE
+				}
+			}
+		}
+		log.Printf("No block source found for click event %+v\n", ce)
+	}
+}
+
+// ClickEvent holds data sent by i3bar when the user clicks a block.
+type ClickEvent struct {
+	Name     string `json:"name"`
+	Instance string `json:"instance"`
+	Button   int    `json:"button"`
+	X        int    `json:"x"`
+	Y        int    `json:"y"`
+}
+
+// ClickEventsListener parses the click event stream and notifies its subscribers.
+type ClickEventsListener struct {
+	r               io.Reader
+	clickEventChans []chan ClickEvent
+}
+
+// NewClickEventsListener returns a ClickEventsListener which reads from r.
+func NewClickEventsListener(r io.Reader) *ClickEventsListener {
+	return &ClickEventsListener{r: r, clickEventChans: make([]chan ClickEvent, 0)}
+}
+
+// Listen reads and decodes the click event stream and forwards them to the channels subscribers.
+func (cel *ClickEventsListener) Listen() {
+	r := bufio.NewReader(cel.r)
+	dec := json.NewDecoder(r)
+	for {
+		var ce ClickEvent
+		// Ignore unwanted chars first
+	IgnoreChars:
+		for {
+			ruune, _, err := r.ReadRune()
+			if err != nil {
+				log.Println(err)
+				break IgnoreChars
+			}
+			switch {
+			case unicode.IsSpace(ruune):
+				// Loop again
+			case ruune == '[':
+				// Loop again
+			case ruune == ',':
+				break IgnoreChars
+			default:
+				r.UnreadRune()
+				break IgnoreChars
+			}
+		}
+		err := dec.Decode(&ce)
+		switch {
+		case err == io.EOF:
+			log.Println("ClickEventsListener: reached EOF")
+			return
+		case err != nil:
+			log.Printf("ClickEventsListener: invalid JSON input: %v\n", err)
+			return
+		default:
+			log.Printf("Received click event %+v\n", ce)
+			for _, ch := range cel.clickEventChans {
+				go func() {
+					ch <- ce
+				}()
+			}
+		}
+	}
+}
+
+// Notifu returns a channel which will be fed by incoming ClickEvents.
+func (cel *ClickEventsListener) Notify() chan ClickEvent {
+	ch := make(chan ClickEvent)
+	cel.clickEventChans = append(cel.clickEventChans, ch)
+	return ch
 }
 
 func init() {
@@ -274,30 +389,37 @@ func main() {
 	}
 	fmt.Fprintf(out, "%s\n[\n", hb)
 
+	// Listen for click events sent from i3bar
+	cel := NewClickEventsListener(os.Stdin)
+	go cel.Listen()
+
 	// Create the block aggregator and start the commands
 	blocksCh := make(chan *BlockAggregate)
+	cmdios := make([]*CmdIO, 0)
 	ba := NewBlockAggregator(out)
 	for _, c := range commands {
 		cmdio, err := NewCmdIO(c)
 		if err != nil {
 			log.Fatal(err)
 		}
-		ba.CmdIOs = append(ba.CmdIOs, cmdio)
+		cmdios = append(cmdios, cmdio)
 		if err := cmdio.Start(blocksCh); err != nil {
 			log.Fatal(err)
 		} else {
 			log.Printf("Starting command: %s", c)
 		}
 	}
-
+	ba.CmdIOs = cmdios
 	go ba.Aggregate(blocksCh)
+
+	ceCh := cel.Notify()
+	go ba.ForwardClickEvents(ceCh)
 
 	// Listen for worthy signals
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2)
 
 	for {
-		// TODO handle sigcont and sigstop received from i3bar, and forward to cmds
 		s := <-c
 		switch s {
 		case syscall.SIGTERM:
@@ -311,6 +433,9 @@ func main() {
 					if err := cmdio.Cmd.Process.Kill(); err != nil {
 						log.Println(err)
 					}
+				}
+				if err := cmdio.Close(); err != nil {
+					log.Println(err)
 				}
 			}
 			os.Exit(0)
