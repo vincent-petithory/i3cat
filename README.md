@@ -128,37 +128,26 @@ Full example below:
 You simply need to wrap them in a script of your choice.
 Example with i3status and a Shell script:
 
-    $ cat ~/.i3/i3status.sh
 	#!/bin/sh
 
-	# Gets a property of a click event
 	click_event_prop() {
 		python -c "import json,sys; obj=json.load(sys.stdin); print(obj['$1'])"
 	}
 
-	# Called on every click event
 	on_click_event() {
 		button=$(echo "$@" | click_event_prop button)
-		if [ ! $button -eq 1 ]; then
-			return
+		if [ $button != '1' ]; then
+		return
 		fi
 		name=$(echo "$@" | click_event_prop name)
 		instance=$(echo "$@" | click_event_prop instance)
-		echo "Click on $name $instance" >> $HOME/.i3/blah.log
-		#case $button in
-		#    1)
-		#        i3-msg '[con_mark="music"]' focus > /dev/null
-		#        ;;
-		#esac
+		# Do something with block $name::$instance ...
 	}
 
-	# Read stdin for JSON click events
-	(while :; do
-		cat | while read line; do on_click_event "$line"; done
-	done) &
-
 	# Output i3status blocks
-	i3status -c $HOME/.i3/status
+	i3status -c $HOME/.i3/status &
+	# Read stdin for JSON click events
+	cat | while read line; do on_click_event "$line"; done
 
 ### More
 
