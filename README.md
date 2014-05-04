@@ -39,13 +39,17 @@ Note that your i3status'conf must have his output in i3bar format. If you didn't
 
 ### Add a block
 
-Say we want to display the current song played by MPD every 10 seconds. The script could be:
+Say we want to display the current song played by MPD and its state. The script could be:
 
 	$ cat ~/.i3/mpd-nowplaying.sh
 	#!/bin/sh
+	(while :; do
+		display_song "$(mpc current --wait)"
+	done) &
+
 	while :; do
-	  echo '[{"name":"mpd","instance":"now playing","full_text":" '$(mpc current)'"}]'
-	  sleep 10
+		display_song "$(mpc current)"
+		mpc idle player > /dev/null
 	done
 
 Edit `~/.i3/i3cat.conf`:
