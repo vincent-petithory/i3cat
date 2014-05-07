@@ -16,11 +16,6 @@ import (
 	"unicode"
 )
 
-var debugFile string
-var logFile string
-var cmdsFile string
-var header Header
-
 // Header defines the struct of the header in the i3bar protocol.
 type Header struct {
 	Version     int  `json:"version"`
@@ -304,25 +299,140 @@ func (cel *ClickEventsListener) Listen() {
 	}
 }
 
-// Notifu returns a channel which will be fed by incoming ClickEvents.
+// Notify returns a channel which will be fed by incoming ClickEvents.
 func (cel *ClickEventsListener) Notify() chan ClickEvent {
 	ch := make(chan ClickEvent)
 	cel.clickEventChans = append(cel.clickEventChans, ch)
 	return ch
 }
 
-func init() {
-	flag.StringVar(&debugFile, "debug-file", "", "Outputs JSON to this file as well; for debugging what is sent to i3bar.")
-	flag.StringVar(&logFile, "log-file", "", "Logs i3cat events in this file. Defaults to STDERR")
-	flag.StringVar(&cmdsFile, "cmd-file", "$HOME/.i3/i3cat.conf", "File listing of the commands to run. It will read from STDIN if - is provided")
-	flag.IntVar(&header.Version, "header-version", 1, "The i3bar header version")
-	flag.IntVar(&header.StopSignal, "header-stopsignal", 0, "The i3bar header stop_signal. i3cat will send this signal to the processes it manages.")
-	flag.IntVar(&header.ContSignal, "header-contsignal", 0, "The i3bar header cont_signal. i3cat will send this signal to the processes it manages.")
-	flag.BoolVar(&header.ClickEvents, "header-clickevents", false, "The i3bar header click_events")
+func main() {
+	var debugFile string
+	var logFile string
+	var cmdsFile string
+	var header Header
+
+	stdFlagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	stdFlagSet.StringVar(&debugFile, "debug-file", "", "Outputs JSON to this file as well; for debugging what is sent to i3bar.")
+	stdFlagSet.StringVar(&logFile, "log-file", "", "Logs i3cat events in this file. Defaults to STDERR")
+	stdFlagSet.StringVar(&cmdsFile, "cmd-file", "$HOME/.i3/i3cat.conf", "File listing of the commands to run. It will read from STDIN if - is provided")
+	stdFlagSet.IntVar(&header.Version, "header-version", 1, "The i3bar header version")
+	stdFlagSet.IntVar(&header.StopSignal, "header-stopsignal", 0, "The i3bar header stop_signal. i3cat will send this signal to the processes it manages.")
+	stdFlagSet.IntVar(&header.ContSignal, "header-contsignal", 0, "The i3bar header cont_signal. i3cat will send this signal to the processes it manages.")
+	stdFlagSet.BoolVar(&header.ClickEvents, "header-clickevents", false, "The i3bar header click_events")
+
+	decFlagSet := flag.NewFlagSet("decode", flag.ExitOnError)
+	var decField string
+
+	encFlagSet := flag.NewFlagSet("encode", flag.ExitOnError)
+	var block Block
+	encFlagSet.StringVar(&block.ShortText, "short-text", "", "the block.short_text field to encode.")
+	encFlagSet.StringVar(&block.Color, "color", "", "the block.color field to encode.")
+	encFlagSet.IntVar(&block.MinWidth, "min-width", 0, "the block.min_width field to encode.")
+	encFlagSet.StringVar(&block.Align, "align", "", "the block.align field to encode.")
+	encFlagSet.StringVar(&block.Name, "name", "", "the block.name field to encode.")
+	encFlagSet.StringVar(&block.Instance, "instance", "", "the block.instance field to encode.")
+	encFlagSet.BoolVar(&block.Urgent, "urgent", false, "the block.urgent field to encode.")
+	encFlagSet.BoolVar(&block.Separator, "separator", false, "the block.separator field to encode.")
+	encFlagSet.IntVar(&block.SeparatorBlockWidth, "separator-block-width", 0, "the block.separator_block_width field to encode.")
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, `Usage: i3cat [COMMAND] [ARGS]
+
+  If COMMAND is not specified, i3cat will print i3bar blocks to stdout.
+
+`)
+		stdFlagSet.PrintDefaults()
+		fmt.Fprintf(os.Stderr, `
+decode: FIELD
+  
+  Reads STDIN and decodes a JSON payload representing a click event; typically sent by i3bar.
+  It will print the FIELD from the JSON structure to stdout.
+  
+  Possible fields are name, instance, button, x, y.
+
+`)
+		decFlagSet.PrintDefaults()
+		fmt.Fprintf(os.Stderr, `
+encode: [OPTS] [FULL_TEXT...]
+  
+  Concats FULL_TEXT arguments, separated with spaces, and encodes it as an i3bar block JSON payload.
+  If FULL_TEXT is -, it will read from STDIN instead.
+  
+  The other fields of an i3bar block are optional and specified with the following options:
+
+`)
+		encFlagSet.PrintDefaults()
+	}
+
 	flag.Parse()
+	switch {
+	case flag.Arg(0) == "decode":
+		decFlagSet.Parse(os.Args[2:])
+		if decFlagSet.NArg() == 0 {
+			flag.Usage()
+			os.Exit(2)
+		}
+		decField = decFlagSet.Arg(0)
+		if err := DecodeClickEvent(os.Stdout, os.Stdin, decField); err != nil {
+			log.Fatal(err)
+		}
+	case flag.Arg(0) == "encode":
+		encFlagSet.Parse(os.Args[2:])
+		switch {
+		case encFlagSet.NArg() == 0:
+			fallthrough
+		case encFlagSet.NArg() == 1 && encFlagSet.Arg(0) == "-":
+			fullText, err := ioutil.ReadAll(os.Stdin)
+			if err != nil {
+				log.Fatal(err)
+			}
+			block.FullText = string(fullText)
+		case encFlagSet.NArg() > 0:
+			block.FullText = strings.Join(encFlagSet.Args(), " ")
+		}
+		if err := EncodeBlock(os.Stdout, block); err != nil {
+			log.Fatal(err)
+		}
+	default:
+		stdFlagSet.Parse(os.Args[1:])
+		if stdFlagSet.NArg() > 0 {
+			flag.Usage()
+			os.Exit(2)
+		}
+		CatBlocksToI3Bar(cmdsFile, header, logFile, debugFile)
+	}
 }
 
-func main() {
+func EncodeBlock(w io.Writer, block Block) error {
+	return json.NewEncoder(w).Encode(block)
+}
+
+func DecodeClickEvent(w io.Writer, r io.Reader, field string) error {
+	var ce ClickEvent
+	if err := json.NewDecoder(r).Decode(&ce); err != nil {
+		return err
+	}
+	var v interface{}
+	switch field {
+	case "name":
+		v = ce.Name
+	case "instance":
+		v = ce.Instance
+	case "button":
+		v = ce.Button
+	case "x":
+		v = ce.X
+	case "y":
+		v = ce.Y
+	default:
+		return fmt.Errorf("unknown property %s", field)
+	}
+	fmt.Fprintln(w, v)
+	return nil
+}
+
+func CatBlocksToI3Bar(cmdsFile string, header Header, logFile string, debugFile string) {
 	// Read and parse commands to run.
 	var cmdsReader io.ReadCloser
 	if cmdsFile == "-" {
