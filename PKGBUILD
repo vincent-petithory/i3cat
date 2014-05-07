@@ -2,7 +2,7 @@
 
 pkgname=i3cat-git
 pkgver=r3.417f5ba
-pkgrel=1
+pkgrel=2
 pkgdesc='A simple program to combine multiple i3bar JSON inputs into one to forward to i3bar.'
 arch=('x86_64' 'i686' 'ARM')
 url='http://vincent-petithory.github.io/i3cat/'
