@@ -84,7 +84,7 @@ Note the JSON output of the script is an array. `i3cat` also supports variants l
 #### Replace echo by i3cat encode
 
 Outputting JSON by hand works only for simple cases.
-`i3cat` provides a helper command command to send blocks:
+`i3cat` provides a helper command to send blocks:
 
 	echo '[{"name": "mpd", "instance": "now playing", "full_text": " '${status}' '$1'", "color": "'${color}'"}]'
 
