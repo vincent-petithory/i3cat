@@ -169,14 +169,42 @@ Example with i3status and a Shell script:
 
 Run `i3cat -h` for a list of options:
 
-    Usage of i3cat:
-      -cmd-file="$HOME/.i3/i3cat.conf": File listing of the commands to run. It will read from STDIN if - is provided
-      -debug-file="": Outputs JSON to this file as well; for debugging what is sent to i3bar.
-      -header-clickevents=false: The i3bar header click_events
-      -header-contsignal=0: The i3bar header cont_signal
-      -header-stopsignal=0: The i3bar header stop_signal
-      -header-version=1: The i3bar header version
-      -log-file="": Logs i3cat events in this file. Defaults to STDERR
+	Usage: i3cat [COMMAND] [ARGS]
+
+	  If COMMAND is not specified, i3cat will print i3bar blocks to stdout.
+
+	  -cmd-file="$HOME/.i3/i3cat.conf": File listing of the commands to run. It will read from STDIN if - is provided
+	  -debug-file="": Outputs JSON to this file as well; for debugging what is sent to i3bar.
+	  -header-clickevents=false: The i3bar header click_events
+	  -header-contsignal=0: The i3bar header cont_signal. i3cat will send this signal to the processes it manages.
+	  -header-stopsignal=0: The i3bar header stop_signal. i3cat will send this signal to the processes it manages.
+	  -header-version=1: The i3bar header version
+	  -log-file="": Logs i3cat events in this file. Defaults to STDERR
+
+	decode: FIELD
+
+	  Reads STDIN and decodes a JSON payload representing a click event; typically sent by i3bar.
+	  It will print the FIELD from the JSON structure to stdout.
+
+	  Possible fields are name, instance, button, x, y.
+
+
+	encode: [OPTS] [FULL_TEXT...]
+
+	  Concats FULL_TEXT arguments, separated with spaces, and encodes it as an i3bar block JSON payload.
+	  If FULL_TEXT is -, it will read from STDIN instead.
+
+	  The other fields of an i3bar block are optional and specified with the following options:
+
+	  -align="": the block.align field to encode.
+	  -color="": the block.color field to encode.
+	  -instance="": the block.instance field to encode.
+	  -min-width=0: the block.min_width field to encode.
+	  -name="": the block.name field to encode.
+	  -separator=false: the block.separator field to encode.
+	  -separator-block-width=0: the block.separator_block_width field to encode.
+	  -short-text="": the block.short_text field to encode.
+	  -urgent=false: the block.urgent field to encode.
 
 ## Design
 
