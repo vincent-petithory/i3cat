@@ -46,7 +46,7 @@ func main() {
 	encFlagSet.BoolVar(&block.Separator, "separator", false, "the block.separator field to encode.")
 	encFlagSet.IntVar(&block.SeparatorBlockWidth, "separator-block-width", 0, "the block.separator_block_width field to encode.")
 
-	flag.Usage = func() {
+	usage := func() {
 		fmt.Fprintf(os.Stderr, `Usage: i3cat [COMMAND] [ARGS]
 
   If COMMAND is not specified, i3cat will print i3bar blocks to stdout.
@@ -75,19 +75,18 @@ encode: [OPTS] [FULL_TEXT...]
 		encFlagSet.PrintDefaults()
 	}
 
-	flag.Parse()
 	switch {
-	case flag.Arg(0) == "decode":
+	case os.Args[1] == "decode":
 		decFlagSet.Parse(os.Args[2:])
 		if decFlagSet.NArg() == 0 {
-			flag.Usage()
+			usage()
 			os.Exit(2)
 		}
 		decField = decFlagSet.Arg(0)
 		if err := DecodeClickEvent(os.Stdout, os.Stdin, decField); err != nil {
 			log.Fatal(err)
 		}
-	case flag.Arg(0) == "encode":
+	case os.Args[1] == "encode":
 		encFlagSet.Parse(os.Args[2:])
 		switch {
 		case encFlagSet.NArg() == 0:
@@ -107,7 +106,7 @@ encode: [OPTS] [FULL_TEXT...]
 	default:
 		stdFlagSet.Parse(os.Args[1:])
 		if stdFlagSet.NArg() > 0 {
-			flag.Usage()
+			usage()
 			os.Exit(2)
 		}
 		CatBlocksToI3Bar(cmdsFile, header, logFile, debugFile)
