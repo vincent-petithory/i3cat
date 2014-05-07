@@ -43,6 +43,22 @@ Say we want to display the current song played by MPD and its state. The script 
 
 	$ cat ~/.i3/mpd-nowplaying.sh
 	#!/bin/sh
+    display_song() {
+        status=
+        color=
+        case $(mpc status | sed 1d | head -n1 | awk '{ print $1 }') in
+    	'[playing]')
+    	    status=
+    	    color='#36a8d5'
+    	    ;;
+    	'[paused]')
+    	    status=
+    	    color=
+    	    ;;
+        esac
+        echo '[{"name": "mpd", "instance": "now playing", "full_text": " '${status}' '$1'", "color": "'${color}'"}]'
+    }
+
 	(while :; do
 		display_song "$(mpc current --wait)"
 	done) &
