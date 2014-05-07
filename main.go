@@ -34,6 +34,8 @@ func main() {
 
 	encFlagSet := flag.NewFlagSet("encode", flag.ExitOnError)
 	var block Block
+	var singleBlock bool
+	encFlagSet.BoolVar(&singleBlock, "single", false, "If true, the block will not be in a JSON array. This allows to combine other blocks before sending to i3bar.")
 	encFlagSet.StringVar(&block.ShortText, "short-text", "", "the block.short_text field to encode.")
 	encFlagSet.StringVar(&block.Color, "color", "", "the block.color field to encode.")
 	encFlagSet.IntVar(&block.MinWidth, "min-width", 0, "the block.min_width field to encode.")
@@ -99,7 +101,7 @@ encode: [OPTS] [FULL_TEXT...]
 		case encFlagSet.NArg() > 0:
 			block.FullText = strings.Join(encFlagSet.Args(), " ")
 		}
-		if err := EncodeBlock(os.Stdout, block); err != nil {
+		if err := EncodeBlock(os.Stdout, block, singleBlock); err != nil {
 			log.Fatal(err)
 		}
 	default:
@@ -112,8 +114,14 @@ encode: [OPTS] [FULL_TEXT...]
 	}
 }
 
-func EncodeBlock(w io.Writer, block Block) error {
-	return json.NewEncoder(w).Encode(block)
+func EncodeBlock(w io.Writer, block Block, single bool) error {
+	var v interface{}
+	if single {
+		v = block
+	} else {
+		v = []Block{block}
+	}
+	return json.NewEncoder(w).Encode(v)
 }
 
 func DecodeClickEvent(w io.Writer, r io.Reader, field string) error {
