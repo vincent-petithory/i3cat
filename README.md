@@ -2,6 +2,8 @@
 
 A simple program to combine multiple i3bar JSON inputs into one to forward to i3bar.
 
+[Project page](http://vincent-petithory.github.io/i3cat/)
+
 ## Motivation
 
  * enjoy the simplicity of i3status, do not replace it with a fully featured wrapper
