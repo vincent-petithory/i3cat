@@ -76,7 +76,7 @@ encode: [OPTS] [FULL_TEXT...]
 	}
 
 	switch {
-	case os.Args[1] == "decode":
+	case len(os.Args) > 1 && os.Args[1] == "decode":
 		decFlagSet.Parse(os.Args[2:])
 		if decFlagSet.NArg() == 0 {
 			usage()
@@ -86,7 +86,7 @@ encode: [OPTS] [FULL_TEXT...]
 		if err := DecodeClickEvent(os.Stdout, os.Stdin, decField); err != nil {
 			log.Fatal(err)
 		}
-	case os.Args[1] == "encode":
+	case len(os.Args) > 1 && os.Args[1] == "encode":
 		encFlagSet.Parse(os.Args[2:])
 		switch {
 		case encFlagSet.NArg() == 0:
