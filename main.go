@@ -43,7 +43,7 @@ func main() {
 	encFlagSet.StringVar(&block.Name, "name", "", "the block.name field to encode.")
 	encFlagSet.StringVar(&block.Instance, "instance", "", "the block.instance field to encode.")
 	encFlagSet.BoolVar(&block.Urgent, "urgent", false, "the block.urgent field to encode.")
-	encFlagSet.BoolVar(&block.Separator, "separator", false, "the block.separator field to encode.")
+	encFlagSet.BoolVar(&block.Separator, "separator", true, "the block.separator field to encode.")
 	encFlagSet.IntVar(&block.SeparatorBlockWidth, "separator-block-width", 0, "the block.separator_block_width field to encode.")
 
 	usage := func() {

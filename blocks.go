@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"unicode"
+
+	"github.com/vincent-petithory/structfield"
 )
 
 // Header defines the struct of the header in the i3bar protocol.
@@ -18,6 +20,18 @@ type Header struct {
 	ContSignal  int  `json:"cont_signal,omitempty"`
 	ClickEvents bool `json:"click_events,omitempty"`
 }
+
+var trueBoolTransformer = structfield.TransformerFunc(func(field string, value interface{}) (string, interface{}) {
+	switch x := value.(type) {
+	case bool:
+		if !x {
+			return field, false
+		}
+	default:
+		panic("trueBoolTransformer: expected bool")
+	}
+	return "", nil
+})
 
 // Block defines the struct of blocks in the i3bar protocol.
 type Block struct {
@@ -29,8 +43,38 @@ type Block struct {
 	Name                string `json:"name,omitempty"`
 	Instance            string `json:"instance,omitempty"`
 	Urgent              bool   `json:"urgent,omitempty"`
-	Separator           bool   `json:"separator,omitempty"`
+	Separator           bool   `json:"separator"`
 	SeparatorBlockWidth int    `json:"separator_block_width,omitempty"`
+}
+
+func (b Block) MarshalJSON() ([]byte, error) {
+	m := structfield.Transform(b, map[string]structfield.Transformer{
+		"separator": trueBoolTransformer,
+	})
+	return json.Marshal(m)
+}
+
+func (b *Block) UnmarshalJSON(data []byte) error {
+	type blockAlias Block
+	ba := blockAlias{}
+	if err := json.Unmarshal(data, &ba); err != nil {
+		return err
+	}
+	*b = Block(ba)
+
+	sep := struct {
+		Value *bool `json:"separator"`
+	}{}
+	if err := json.Unmarshal(data, &sep); err != nil {
+		return err
+	}
+	if sep.Value != nil {
+		b.Separator = *sep.Value
+	} else {
+		// defaults to true
+		b.Separator = true
+	}
+	return nil
 }
 
 // String implements Stringer interface.
