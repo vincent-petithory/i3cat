@@ -50,7 +50,7 @@ func (cel *ClickEventsListener) Listen() {
 			case ruune == ',':
 				break IgnoreChars
 			default:
-				r.UnreadRune()
+				_ = r.UnreadRune()
 				break IgnoreChars
 			}
 		}
@@ -65,8 +65,9 @@ func (cel *ClickEventsListener) Listen() {
 		default:
 			log.Printf("Received click event %+v\n", ce)
 			for _, ch := range cel.clickEventChans {
+				sch := ch
 				go func() {
-					ch <- ce
+					sch <- ce
 				}()
 			}
 		}

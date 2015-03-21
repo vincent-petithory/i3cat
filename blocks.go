@@ -151,7 +151,7 @@ func (c *CmdIO) Start(blockAggregatesCh chan<- *BlockAggregate) error {
 				return
 			}
 		} else {
-			r.UnreadRune()
+			_ = r.UnreadRune()
 		}
 		dec := json.NewDecoder(r)
 		for {
@@ -170,7 +170,7 @@ func (c *CmdIO) Start(blockAggregatesCh chan<- *BlockAggregate) error {
 				case ruune == ',':
 					break IgnoreChars
 				default:
-					r.UnreadRune()
+					_ = r.UnreadRune()
 					break IgnoreChars
 				}
 			}
@@ -236,14 +236,19 @@ func (ba *BlockAggregator) Aggregate(blockAggregates <-chan *BlockAggregate) {
 	jw := json.NewEncoder(ba.W)
 	for blockAggregate := range blockAggregates {
 		ba.Blocks[blockAggregate.CmdIO] = blockAggregate.Blocks
-		blocksUpdate := make([]*Block, 0)
+		var blocksUpdate []*Block
 		for _, cmdio := range ba.CmdIOs {
 			blocksUpdate = append(blocksUpdate, ba.Blocks[cmdio]...)
+		}
+		if blocksUpdate == nil {
+			blocksUpdate = []*Block{}
 		}
 		if err := jw.Encode(blocksUpdate); err != nil {
 			log.Println(err)
 		}
-		ba.W.Write([]byte(","))
+		if _, err := ba.W.Write([]byte(",")); err != nil {
+			log.Println(err)
+		}
 	}
 }
 

@@ -77,7 +77,11 @@ encode: [OPTS] [FULL_TEXT...]
 
 	switch {
 	case len(os.Args) > 1 && os.Args[1] == "decode":
-		decFlagSet.Parse(os.Args[2:])
+		if err := decFlagSet.Parse(os.Args[2:]); err != nil {
+			log.Print(err)
+			usage()
+			os.Exit(2)
+		}
 		if decFlagSet.NArg() == 0 {
 			usage()
 			os.Exit(2)
@@ -87,7 +91,11 @@ encode: [OPTS] [FULL_TEXT...]
 			log.Fatal(err)
 		}
 	case len(os.Args) > 1 && os.Args[1] == "encode":
-		encFlagSet.Parse(os.Args[2:])
+		if err := encFlagSet.Parse(os.Args[2:]); err != nil {
+			log.Print(err)
+			usage()
+			os.Exit(2)
+		}
 		switch {
 		case encFlagSet.NArg() == 0:
 			fallthrough
@@ -104,7 +112,11 @@ encode: [OPTS] [FULL_TEXT...]
 			log.Fatal(err)
 		}
 	default:
-		stdFlagSet.Parse(os.Args[1:])
+		if err := stdFlagSet.Parse(os.Args[1:]); err != nil {
+			log.Print(err)
+			usage()
+			os.Exit(2)
+		}
 		if stdFlagSet.NArg() > 0 {
 			usage()
 			os.Exit(2)
@@ -159,7 +171,7 @@ func CatBlocksToI3Bar(cmdsFile string, header Header, logFile string, debugFile 
 		}
 		cmdsReader = f
 	}
-	commands := make([]string, 0)
+	var commands []string
 	scanner := bufio.NewScanner(cmdsReader)
 	for scanner.Scan() {
 		cmd := strings.TrimSpace(scanner.Text())
@@ -170,7 +182,9 @@ func CatBlocksToI3Bar(cmdsFile string, header Header, logFile string, debugFile 
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
-	cmdsReader.Close()
+	if err := cmdsReader.Close(); err != nil {
+		log.Fatal(err)
+	}
 
 	// Init log output.
 	if logFile != "" {
@@ -178,7 +192,9 @@ func CatBlocksToI3Bar(cmdsFile string, header Header, logFile string, debugFile 
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer f.Close()
+		defer func() {
+			_ = f.Close()
+		}()
 		log.SetOutput(f)
 	}
 
@@ -189,7 +205,9 @@ func CatBlocksToI3Bar(cmdsFile string, header Header, logFile string, debugFile 
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer f.Close()
+		defer func() {
+			_ = f.Close()
+		}()
 		out = io.MultiWriter(os.Stdout, f)
 	} else {
 		out = os.Stdout
@@ -220,7 +238,7 @@ func CatBlocksToI3Bar(cmdsFile string, header Header, logFile string, debugFile 
 
 	// Create the block aggregator and start the commands
 	blocksCh := make(chan *BlockAggregate)
-	cmdios := make([]*CmdIO, 0)
+	var cmdios []*CmdIO
 	ba := NewBlockAggregator(out)
 	for _, c := range commands {
 		cmdio, err := NewCmdIO(c)
