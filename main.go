@@ -257,12 +257,6 @@ func CatBlocksToI3Bar(cmdsFile string, header Header, logFile string, debugFile 
 			// Kill all processes on interrupt
 			log.Println("SIGINT or SIGTERM received: terminating all processes...")
 			for _, cmdio := range ba.CmdIOs {
-				if err := cmdio.Cmd.Process.Signal(syscall.SIGTERM); err != nil {
-					log.Println(err)
-					if err := cmdio.Cmd.Process.Kill(); err != nil {
-						log.Println(err)
-					}
-				}
 				if err := cmdio.Close(); err != nil {
 					log.Println(err)
 				}

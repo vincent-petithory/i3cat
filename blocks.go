@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"syscall"
 	"unicode"
 
 	"github.com/vincent-petithory/structfield"
@@ -203,6 +204,15 @@ func (c *CmdIO) Start(blockAggregatesCh chan<- *BlockAggregate) error {
 
 // Close closes reader and writers of this CmdIO.
 func (c *CmdIO) Close() error {
+	if err := c.Cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		log.Println(err)
+		if err := c.Cmd.Process.Kill(); err != nil {
+			return err
+		}
+	}
+	if err := c.Cmd.Process.Release(); err != nil {
+		return err
+	}
 	if err := c.reader.Close(); err != nil {
 		return err
 	}
