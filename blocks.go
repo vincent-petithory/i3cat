@@ -46,6 +46,9 @@ type Block struct {
 	Urgent              bool   `json:"urgent,omitempty"`
 	Separator           bool   `json:"separator"`
 	SeparatorBlockWidth int    `json:"separator_block_width,omitempty"`
+	Background          string `json:"background,omitempty"`
+	Border              string `json:"border,omitempty"`
+	Markup              string `json:"markup,omitempty"`
 }
 
 func (b Block) MarshalJSON() ([]byte, error) {
