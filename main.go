@@ -43,6 +43,9 @@ func main() {
 	encFlagSet.BoolVar(&block.Urgent, "urgent", false, "the block.urgent field to encode.")
 	encFlagSet.BoolVar(&block.Separator, "separator", true, "the block.separator field to encode.")
 	encFlagSet.IntVar(&block.SeparatorBlockWidth, "separator-block-width", 0, "the block.separator_block_width field to encode.")
+	encFlagSet.StringVar(&block.Background, "background", "", "the block.background field to encode.")
+	encFlagSet.StringVar(&block.Border, "border", "", "the block.border field to encode.")
+	encFlagSet.StringVar(&block.Markup, "markup", "", "the block.markup field to encode.")
 
 	usage := func() {
 		fmt.Fprintf(os.Stderr, `Usage: i3cat [COMMAND] [ARGS]
